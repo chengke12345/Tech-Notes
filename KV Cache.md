@@ -18,11 +18,11 @@ q1 和 k1 算 attention weight, 然后乘以v1的到o1。q2去和k1, k2算出 2�
 
 ![[Pasted image 20260325003447.png]]
 
-所以 q4 直接去跟之前存下来的 k1~k3 算 attention, 也跟 k4 自己算 attention。然后得到 4 个 attention weight。然后把它们跟 v1~v4 做 weighted sum。得到下一个输出 o4。这样就可以<font color="#eb4349">节省输入token后，计算 v1~v3, k1~k3 需要的时间(要把输入乘上一个 Matrix 才能把 k 和 v 计算出来)</font>。所以，我们会把已经算出来的k 和 v 存下来，以留待日后使用。
+所以 q4 直接去跟之前存下来的 k1-k3 算 attention, 也跟 k4 自己算 attention。然后得到 4 个 attention weight。然后把它们跟 v1-v4 做 weighted sum。得到下一个输出 o4。这样就可以<font color="#eb4349">节省输入token后，计算 v1-v3, k1-k3 需要的时间(要把输入乘上一个 Matrix 才能把 k 和 v 计算出来)</font>。所以，我们会把已经算出来的k 和 v 存下来，以留待日后使用。
 
 ![[Pasted image 20260325003942.png]]
 
-之后再进来第五个token。虽然前面有 4 个 token，但是它们的 V 和 K 不需要再重新计算了。第五个Token进来只需要算自己的 q5, k5, v5 , 然后再去计算q5与 k1～k4 以及和 k5 自己的 attention值，再和 v1~v5 做 weighted sum 就可以得到o5了。它就不需要再算前面已经算出来的 k1~k4 和 v1~v4 了。这就是 KV Cache 的概念。
+之后再进来第五个token。虽然前面有 4 个 token，但是它们的 V 和 K 不需要再重新计算了。第五个Token进来只需要算自己的 q5, k5, v5 , 然后再去计算q5与 k1-k4 以及和 k5 自己的 attention值，再和 v1-v5 做 weighted sum 就可以得到o5了。它就不需要再算前面已经算出来的 k1-k4 和 v1-v4 了。这就是 KV Cache 的概念。
 
 ## <font color="grape">KVCache撑爆显存</font>
 
@@ -226,11 +226,10 @@ sliding window attention 往往会让模型的表现变差，尤其在输入的s
 
 
 > [!NOTE]  KV Cache 一般过程总结
-> Contents
- <font color="grape">[prefill]</font>
- <font color="pink">用户输入Prompt(假设有 n 个token)，一次并行送入模型。假设模型有L层深度的Layer。从第1层到第 L 层全部算完。每层都会有 n 个 k, n 个 v。各自填入 KV Cache。最后在第L层输出的最后一个向量经过 LM Head 得到第一个生成的token</font>
- <font color="grape">[decode]</font>
- <font color="pink">每次只有一个新生成的token，作为输入，从第 1 层，走到第 L 层。每一层做的事，就是对这个新 token, 算出它的q, k, v，把新的 k , v 添加(append)到这一层的kv cache里。用 q 对缓存中的所有 k 做 attention weights，再跟所有的 v 做weighted sum, 得到新的输出向量。传给下一层，走完 L 层之后，产生下一个生成的Token。然后重复这个过程。</font>
+> - <font color="grape">[prefill]</font>
+>   <font color="pink">用户输入Prompt(假设有 n 个token)，一次并行送入模型。假设模型有L层深度的Layer。从第1层到第 L 层全部算完。每层都会有 n 个 k, n 个 v。各自填入 KV Cache。最后在第L层输出的最后一个向量经过 LM Head 得到第一个生成的token</font>
+> - <font color="grape">[decode]</font>
+>   <font color="pink">每次只有一个新生成的token，作为输入，从第 1 层，走到第 L 层。每一层做的事，就是对这个新 token, 算出它的q, k, v，把新的 k , v 添加(append)到这一层的kv cache里。用 q 对缓存中的所有 k 做 attention weights，再跟所有的 v 做weighted sum, 得到新的输出向量。传给下一层，走完 L 层之后，产生下一个生成的Token。然后重复这个过程。</font>
 
 这个过程中有几点特别值得关注：
 - <font color="#45ce6e">假设大模型是有 L 层深度的 network。每一层都是自己独立的 KV Cache，只能用于本层的attention计算。它们是按层独立维护的，第 n 层缓存的 KV 对第 n+1 层没用。</font>
